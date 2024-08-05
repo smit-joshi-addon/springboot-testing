@@ -1,7 +1,15 @@
 package com.ntloc.demo.customer;
 
-import com.ntloc.demo.exception.CustomerEmailUnavailableException;
-import com.ntloc.demo.exception.CustomerNotFoundException;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,281 +18,185 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import com.ntloc.demo.exception.CustomerEmailUnavailableException;
+import com.ntloc.demo.exception.CustomerNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class CustomerServiceTest {
 
-    CustomerService underTest;
-    @Mock
-    CustomerRepository customerRepository;
-    @Captor
-    ArgumentCaptor<Customer> customerArgumentCaptor;
+	CustomerService underTest;
 
-    @BeforeEach
-    void setUp() {
-        underTest = new CustomerService(customerRepository);
-    }
+	@Mock
+	CustomerRepository customerRepository;
 
-    @Test
-    void shouldGetAllCustomers() {
-        //given
-        //when
-        underTest.getCustomers();
-        //then
-        verify(customerRepository).findAll();
-    }
+	@Captor
+	ArgumentCaptor<Customer> customerArgumentCaptor;
 
-    @Test
-    void shouldThrowNotFoundWhenGivenInvalidIDWhileGetCustomerById() {
-        //given
-        long id = 5L;
-        when(customerRepository.findById(anyLong())).thenReturn(Optional.empty());
-        //when
-        //then
-        assertThatThrownBy(() ->
-                underTest.getCustomerById(id))
-                .isInstanceOf(CustomerNotFoundException.class)
-                .hasMessage("Customer with id " + id + " doesn't found");
-    }
-    @Test
-    void shouldGetCustomerById() {
-        //given
-        long id = 5L;
-        String name = "leon";
-        String email = "leon@gmail.com";
-        String address = "US";
-        Customer customer = Customer.create(
-                id,
-                name,
-                email,
-                address
-        );
-        when(customerRepository.findById(id)).thenReturn(Optional.of(customer));
-        //when
-        Customer customerById = underTest.getCustomerById(id);
-        //then
-        assertThat(customerById.getId()).isEqualTo(id);
-        assertThat(customerById.getName()).isEqualTo(name);
-        assertThat(customerById.getEmail()).isEqualTo(email);
-        assertThat(customerById.getAddress()).isEqualTo(address);
-    }
+	@BeforeEach
+	void setUp() {
+		underTest = new CustomerService(customerRepository);
+	}
 
+	@Test
+	void shouldGetAllCustomers() {
+		// given
 
-    @Test
-    void shouldCreateCustomer() {
-        //given
-        CreateCustomerRequest createCustomerRequest =
-                new CreateCustomerRequest(
-                        "leon",
-                        "leon@gmail.com",
-                        "US");
-        //when
-        underTest.createCustomer(createCustomerRequest);
-        //then
-        verify(customerRepository).save(customerArgumentCaptor.capture());
-        Customer customerCaptured = customerArgumentCaptor.getValue();
+		// when
+		underTest.getCustomers();
+		// then
+		verify(customerRepository).findAll();
+	}
 
-        assertThat(customerCaptured.getName()).isEqualTo(createCustomerRequest.name());
-        assertThat(customerCaptured.getEmail()).isEqualTo(createCustomerRequest.email());
-        assertThat(customerCaptured.getAddress()).isEqualTo(createCustomerRequest.address());
+	@Test
+	void shouldCreateCustomer() {
+		// given
+		CreateCustomerRequest customerRequest = new CreateCustomerRequest("smit", "smit@gmail.com", "IND");
+		// when
+		underTest.createCustomer(customerRequest);
+		// then
+		verify(customerRepository).save(customerArgumentCaptor.capture());
+		Customer customerCaptured = customerArgumentCaptor.getValue();
+		assertThat(customerCaptured.getName()).isEqualTo(customerRequest.name());
+		assertThat(customerCaptured.getEmail()).isEqualTo(customerRequest.email());
+		assertThat(customerCaptured.getAddress()).isEqualTo(customerRequest.address());
+	}
 
-    }
+	@Test
+	void shouldNotCreateCustomerANdThrowExceptionWhenCustomerFindByEmailIsPresent() {
+		// given
+		CreateCustomerRequest customerRequest = new CreateCustomerRequest("smit", "smit@gmail.com", "IND");
+		when(customerRepository.findByEmail(anyString())).thenReturn(Optional.of(new Customer()));
+		// when
 
-    @Test
-    void shouldNotCreateCustomerAndThrowExceptionWhenEmailUnavailable() {
-        //given
-        CreateCustomerRequest createCustomerRequest =
-                new CreateCustomerRequest(
-                        "leon",
-                        "leon@gmail.com",
-                        "US");
-        when(customerRepository.findByEmail(anyString())).thenReturn(Optional.of(new Customer()));
-        //when
-        //then
-        assertThatThrownBy(() ->
-                underTest.createCustomer(createCustomerRequest))
-                .isInstanceOf(CustomerEmailUnavailableException.class)
-                .hasMessage("The email " + createCustomerRequest.email() + " unavailable.");
+		// then
+		assertThatThrownBy(() -> underTest.createCustomer(customerRequest))
+				.isInstanceOf(CustomerEmailUnavailableException.class)
+				.hasMessage("The email " + customerRequest.email() + " unavailable.");
+	}
 
-    }
+	@Test
+	void ShouldThrowNotFoundWhenGivenInvalidIDWhileUpdateCustomer() {
+		// given
+		Long id = 5l;
+		String name = "smit";
+		String email = "smit@gmail.com";
+		String address = "IND";
+		when(customerRepository.findById(id)).thenReturn(Optional.empty());
+		// when
+		// then
+		assertThatThrownBy(() -> underTest.updateCustomer(id, name, email, address))
+				.isInstanceOf(CustomerNotFoundException.class).hasMessage("Customer with id " + id + " doesn't found");
 
-    @Test
-    void shouldThrowNotFoundWhenGivenInvalidIDWhileUpdateCustomer() {
-        //given
-        long id = 5L;
-        String name = "leon";
-        String email = "leon@gmail.com";
-        String address = "US";
-        when(customerRepository.findById(id))
-                .thenReturn(Optional.empty());
-        //when
-        //then
-        assertThatThrownBy(() ->
-                underTest.updateCustomer(id, name, email, address))
-                .isInstanceOf(CustomerNotFoundException.class)
-                .hasMessage("Customer with id " + id + " doesn't found");
+		verify(customerRepository, never()).save(any());
+	}
 
-        verify(customerRepository, never()).save(any());
-    }
+	@Test
+	void shouldOnlyUpdateCustomerName() {
+		// given
+		Long id = 5l;
+		Customer customer = new Customer(id, "smit", "smit@gmail.com", "IND");
+		when(customerRepository.findById(id)).thenReturn(Optional.of(customer));
+		// when
+		String newName = "smit joshi";
+		underTest.updateCustomer(id, newName, null, null);
+		// then
+		verify(customerRepository).save(customerArgumentCaptor.capture());
+		Customer capturedCustomer = customerArgumentCaptor.getValue();
+		assertThat(capturedCustomer.getName()).isEqualTo(newName);
+		assertThat(capturedCustomer.getEmail()).isEqualTo(customer.getEmail());
+		assertThat(capturedCustomer.getAddress()).isEqualTo(customer.getAddress());
+	}
 
-    @Test
-    void shouldOnlyUpdateCustomerName() {
-        //given
-        long id = 5L;
-        Customer customer = Customer.create(
-                id,
-                "leon",
-                "leon@gmail.com",
-                "US"
-        );
-        String newName = "leon mark";
-        when(customerRepository.findById(id))
-                .thenReturn(Optional.of(customer));
-        //when
-        underTest.updateCustomer(id, newName, null, null);
-        //then
-        verify(customerRepository).save(customerArgumentCaptor.capture());
-        Customer capturedCustomer = customerArgumentCaptor.getValue();
+	@Test
+	void shouldThrowEmailUnavailableWhenGivenEmailAlreadyPresentWhileUpdatingCustomer() {
+		// given
+		Long id = 5l;
+		Customer customer = Customer.create(id, "smit", "smit@gmai.com", "IND");
+		String newEmail = "smit@bing.com";
+		when(customerRepository.findById(id)).thenReturn(Optional.of(customer));
+		when(customerRepository.findByEmail(newEmail)).thenReturn(Optional.of(new Customer()));
+		// then
+		// when
+		assertThatThrownBy(() -> underTest.updateCustomer(id, null, newEmail, null))
+				.isInstanceOf(CustomerEmailUnavailableException.class)
+				.hasMessage("The email \"" + newEmail + "\" unavailable to update");
+		verify(customerRepository, never()).save(customer);
+	}
 
-        assertThat(capturedCustomer.getName()).isEqualTo(newName);
-        assertThat(capturedCustomer.getEmail()).isEqualTo(customer.getEmail());
-        assertThat(capturedCustomer.getAddress()).isEqualTo(customer.getAddress());
-    }
+	@Test
+	void shouldOnlyUpdateCustomerEmail() {
+		// given
+		Long id = 5l;
+		Customer customer = new Customer(id, "smit", "smit@gmail.com", "IND");
+		when(customerRepository.findById(id)).thenReturn(Optional.of(customer));
+		// when
+		String newEmail = "smit@bing.com";
+		underTest.updateCustomer(id, null, newEmail, null);
+		// then
+		verify(customerRepository).save(customerArgumentCaptor.capture());
+		Customer capturedCustomer = customerArgumentCaptor.getValue();
+		assertThat(capturedCustomer.getName()).isEqualTo(customer.getName());
+		assertThat(capturedCustomer.getEmail()).isEqualTo(newEmail);
+		assertThat(capturedCustomer.getAddress()).isEqualTo(customer.getAddress());
+	}
 
-    @Test
-    void shouldThrowEmailUnavailableWhenGivenEmailAlreadyPresentedWhileUpdateCustomer() {
-        //given
-        long id = 5L;
-        Customer customer = Customer.create(
-                id,
-                "leon",
-                "leon@gmail.com",
-                "US"
-        );
-        String newEmail = "leonaldo@gmail.com";
-        when(customerRepository.findById(id))
-                .thenReturn(Optional.of(customer));
-        when(customerRepository.findByEmail(newEmail)).thenReturn(Optional.of(new Customer()));
-        //when
-        //then
-        assertThatThrownBy(() ->
-                underTest.updateCustomer(id, null, newEmail, null))
-                .isInstanceOf(CustomerEmailUnavailableException.class)
-                .hasMessage("The email \"" + newEmail + "\" unavailable to update");
+	@Test
+	void shouldOnlyUpdateCustomerAddress() {
+		// given
+		Long id = 5l;
+		Customer customer = new Customer(id, "smit", "smit@gmail.com", "IND");
+		when(customerRepository.findById(id)).thenReturn(Optional.of(customer));
+		// then
+		String newAddress = "UK";
+		underTest.updateCustomer(id, null, null, newAddress);
+		// then
+		verify(customerRepository).save(customerArgumentCaptor.capture());
+		Customer capturedCustomer = customerArgumentCaptor.getValue();
+		assertThat(capturedCustomer.getName()).isEqualTo(customer.getName());
+		assertThat(capturedCustomer.getEmail()).isEqualTo(customer.getEmail());
+		assertThat(capturedCustomer.getAddress()).isEqualTo(newAddress);
+	}
 
-        verify(customerRepository, never()).save(any());
-    }
+	@Test
+	void shouldUpdateAllAttributesWhenUpdateCustomer() {
+		// given
+		Long id = 5l;
+		Customer customer = new Customer(id, "smit", "smit@gmail.com", "IND");
+		when(customerRepository.findById(id)).thenReturn(Optional.of(customer));
+		// when
+		String newName = "Smit Joshi";
+		String newEmail = "smit@bind.com";
+		String newAddress = "UK";
+		underTest.updateCustomer(id, newName, newEmail, newAddress);
+		// then
+		verify(customerRepository).save(customerArgumentCaptor.capture());
+		Customer capturedCustomer = customerArgumentCaptor.getValue();
+		assertThat(capturedCustomer.getName()).isEqualTo(newName);
+		assertThat(capturedCustomer.getEmail()).isEqualTo(newEmail);
+		assertThat(capturedCustomer.getAddress()).isEqualTo(newAddress);
+	}
 
-    @Test
-    void shouldUpdateOnlyCustomerEmail() {
-        //given
-        long id = 5L;
-        Customer customer = Customer.create(
-                id,
-                "leon",
-                "leon@gmail.com",
-                "US"
-        );
-        String newEmail = "leonaldo@gmail.com";
-        when(customerRepository.findById(id))
-                .thenReturn(Optional.of(customer));
-        //when
-        underTest.updateCustomer(id, null, newEmail, null);
-        //then
-        verify(customerRepository).save(customerArgumentCaptor.capture());
-        Customer capturedCustomer = customerArgumentCaptor.getValue();
+	@Test
+	void shouldThrowNotFoundWhenGivenIdDoesNotExistWhileDeletingCustomer() {
+		// give
+		Long id = 5l;
+		when(customerRepository.existsById(id)).thenReturn(Boolean.FALSE);
+		// when
+		// then
+		assertThatThrownBy(() -> underTest.deleteCustomer(id)).isInstanceOf(CustomerNotFoundException.class)
+				.hasMessage("Customer with id " + id + " doesn't exist.");
+		verify(customerRepository,never()).deleteById(id);
+	}
 
-        assertThat(capturedCustomer.getName()).isEqualTo(customer.getName());
-        assertThat(capturedCustomer.getEmail()).isEqualTo(newEmail);
-        assertThat(capturedCustomer.getAddress()).isEqualTo(customer.getAddress());
-    }
-
-    @Test
-    void shouldUpdateOnlyCustomerAddress() {
-        //given
-        long id = 5L;
-        Customer customer = Customer.create(
-                id,
-                "leon",
-                "leon@gmail.com",
-                "US"
-        );
-        String newAddress = "UK";
-        when(customerRepository.findById(id))
-                .thenReturn(Optional.of(customer));
-        //when
-        underTest.updateCustomer(id, null, null, newAddress);
-        //then
-        verify(customerRepository).save(customerArgumentCaptor.capture());
-        Customer capturedCustomer = customerArgumentCaptor.getValue();
-
-        assertThat(capturedCustomer.getName()).isEqualTo(customer.getName());
-        assertThat(capturedCustomer.getEmail()).isEqualTo(customer.getEmail());
-        assertThat(capturedCustomer.getAddress()).isEqualTo(newAddress);
-    }
-
-    @Test
-    void shouldUpdateAllAttributeWhenUpdateCustomer() {
-        //given
-        long id = 5L;
-        Customer customer = Customer.create(
-                id,
-                "leon",
-                "leon@gmail.com",
-                "US"
-        );
-        String newName = "leonaldo";
-        String newEmail = "leonaldo@gmail.com";
-        String newAddress = "UK";
-        when(customerRepository.findById(id))
-                .thenReturn(Optional.of(customer));
-        //when
-        underTest.updateCustomer(id, newName, newEmail, newAddress);
-        //then
-        verify(customerRepository).save(customerArgumentCaptor.capture());
-        Customer capturedCustomer = customerArgumentCaptor.getValue();
-
-        assertThat(capturedCustomer.getName()).isEqualTo(newName);
-        assertThat(capturedCustomer.getEmail()).isEqualTo(newEmail);
-        assertThat(capturedCustomer.getAddress()).isEqualTo(newAddress);
-    }
-
-
-    @Test
-    void shouldThrowNotFoundWhenGivenIdDoesNotExistWhileDeleteCustomer() {
-        //given
-        long id = 5L;
-        when(customerRepository.existsById(id))
-                .thenReturn(false);
-        //when
-        //then
-        assertThatThrownBy(() ->
-                underTest.deleteCustomer(id))
-                .isInstanceOf(CustomerNotFoundException.class)
-                .hasMessage("Customer with id " + id + " doesn't exist.");
-        verify(customerRepository, never()).deleteById(any());
-
-    }
-
-    @Test
-    void shouldDeleteCustomer() {
-        //given
-        long id = 5L;
-        when(customerRepository.existsById(id))
-                .thenReturn(true);
-        //when
-        underTest.deleteCustomer(id);
-        //then
-        verify(customerRepository).deleteById(id);
-
-    }
-
+	@Test
+	void shouldDeleteCustomer() {
+		// given
+		Long id = 5l;
+		when(customerRepository.existsById(id)).thenReturn(Boolean.TRUE);
+		// when
+		underTest.deleteCustomer(id);
+		// then
+		verify(customerRepository).deleteById(id);
+	}
 
 }
